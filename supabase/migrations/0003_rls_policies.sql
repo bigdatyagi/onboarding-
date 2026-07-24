@@ -45,6 +45,10 @@ create or replace function public.guard_profile_columns()
 returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
+  -- allow trusted internal operations (points award/clawback from task triggers)
+  if coalesce(current_setting('teampulse.system_op', true), '') = 'on' then
+    return new;
+  end if;
   if not public.is_admin() then
     if new.role       is distinct from old.role
     or new.status     is distinct from old.status

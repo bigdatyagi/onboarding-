@@ -103,10 +103,15 @@ begin
         new.awarded_points = greatest(0,
           new.points + new.bonus -
           case when new.due_at is not null and now() > new.due_at then new.late_penalty else 0 end);
+        -- system flag lets the profile column-guard allow this internal update
+        perform set_config('teampulse.system_op', 'on', true);
         update public.profiles set points = points + new.awarded_points where id = new.assignee_id;
+        perform set_config('teampulse.system_op', '', true);
       elsif old.status = 'done' and new.status <> 'done' then
         -- reopened: claw back points
+        perform set_config('teampulse.system_op', 'on', true);
         update public.profiles set points = greatest(0, points - coalesce(old.awarded_points,0)) where id = old.assignee_id;
+        perform set_config('teampulse.system_op', '', true);
         new.awarded_points = null;
         new.completed_at = null;
       end if;
@@ -127,14 +132,23 @@ begin
       insert into public.task_history(task_id, actor_id, field, old_value, new_value)
       values (new.id, auth.uid(), 'progress', old.progress::text, new.progress::text);
     end if;
-  elsif tg_op = 'INSERT' then
-    insert into public.task_history(task_id, actor_id, field, old_value, new_value)
-    values (new.id, auth.uid(), 'created', null, new.title);
   end if;
   return new;
 end $$;
-create trigger trg_task_log before insert or update on public.tasks
+create trigger trg_task_log before update on public.tasks
 for each row execute function public.log_task_change();
+
+-- Creation history must be AFTER INSERT (task row must exist for the FK)
+create or replace function public.log_task_insert()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.task_history(task_id, actor_id, field, old_value, new_value)
+  values (new.id, auth.uid(), 'created', null, new.title);
+  return new;
+end $$;
+create trigger trg_task_insert_log after insert on public.tasks
+for each row execute function public.log_task_insert();
 
 -- ---------- RECURRING TASKS: spawn next occurrence when done ----------
 create or replace function public.spawn_recurring_task()
