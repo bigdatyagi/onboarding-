@@ -34,8 +34,26 @@
   4. `0004_rpc_performance.sql` — performance engine, leaderboard, dashboard stats, reminders, admin RPCs, `v_task_board` view
 - **Key security**: all queries via anon key + RLS; `security definer` RPCs check roles internally; protected columns (role/status/points) blocked by triggers
 
+## 🧪 Demo Accounts (after running `supabase/seed_demo.sql`)
+All demo accounts share the password **`Demo1234!`** (emails are pre-confirmed):
+
+| Email | Role | Department |
+|---|---|---|
+| `admin@teampulse.demo` | Super Admin | Engineering |
+| `owner@teampulse.demo` | Owner | Engineering |
+| `teacher@teampulse.demo` | Teacher | Education |
+| `lead@teampulse.demo` | Team Leader | Engineering |
+| `student@teampulse.demo` | Student | Engineering |
+| `intern@teampulse.demo` | Intern | Engineering |
+
+Seed data: 3 departments, 16 tasks (all statuses, subtasks, a dependency, recurring tasks), checklists, comments, 7 days of attendance, notifications.
+
+> ⚠️ Demo accounts are for testing only — delete them (or change passwords) before real production use:
+> `delete from auth.users where email like '%@teampulse.demo';`
+
 ## Setup Guide
 1. Create a project at supabase.com → SQL Editor → run migrations 0001→0004 in order
+   - **One-paste option**: run `teampulse_setup_with_demo.sql` (all migrations + demo data) in the SQL Editor
 2. (Recommended) Auth → Providers → Email: keep "Confirm email" ON
 3. Auth → URL Configuration → set Site URL to your app URL
 4. Provide env vars:
@@ -49,6 +67,20 @@
 - **Managers**: create/assign tasks with points & reviewers, review submissions with quality ratings, monitor attendance & leaderboard
 - **Admins**: approve accounts, manage roles/departments, inspect audit log
 
+## ✅ Test Results (validated on PostgreSQL 17 with Supabase-compatible shim)
+- All 4 migrations + demo seed apply cleanly end-to-end
+- 30/30 HTTP tests pass (API, all 14 SPA routes, all 14 static assets)
+- Points engine: award on done (base+bonus−late), clawback on reopen ✓
+- Task history logging, checklist→progress sync ✓
+- Dependency blocking (unfinished blocker prevents start) ✓
+- Recurring task respawn (weekly → next due date) ✓
+- Attendance late detection (09:30 → late, 08:55 → present) ✓
+- Notification fan-out on assignment ✓
+- RBAC guards: self role-escalation blocked, points tampering blocked, scoring-field tampering blocked, self review-approval blocked ✓
+- RLS: intern sees 10/16 tasks, admin 16/16, unauthenticated 0; notifications strictly per-user ✓
+- RPCs: leaderboard, compute_performance, dashboard stats, snapshots, reminders (idempotent), admin ops, soft delete ✓
+- Security headers live; no secrets in git; `.dev.vars` ignored
+
 ## 🔜 Not Yet Implemented
 - Production deployment to Cloudflare Pages (awaiting user's choice: BYOK vs Genspark-hosted)
 - Scheduled snapshot generation (currently on-demand; could use Supabase pg_cron)
@@ -58,4 +90,4 @@
 ## Deployment
 - **Platform**: Cloudflare Pages (Hono edge) — build: `npm run build`, output `dist/`
 - **Status**: ✅ Dev running (PM2 + wrangler pages dev) · ⬜ Production pending
-- **Last Updated**: 2026-07-09
+- **Last Updated**: 2026-07-24
