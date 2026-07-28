@@ -9,3 +9,10 @@ pids/
 *.pid
 *.tar.gz
 *.bak
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
